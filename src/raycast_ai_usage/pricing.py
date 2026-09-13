@@ -102,6 +102,8 @@ def aggregate(events: list[Event], now: float) -> dict:
     for event in events:
         estimate = cost(event)
         for window, seconds in WINDOWS.items():
+            if event.windows is not None and window not in event.windows:
+                continue
             if event.ts > now or (seconds is not None and event.ts < now - seconds):
                 continue
             bucket = result[event.provider][window]

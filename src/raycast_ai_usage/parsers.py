@@ -138,6 +138,44 @@ def parse_claude(path: Path, warnings: list[str]) -> list[Event]:
     return list(events.values())
 
 
+def parse_claude_stats(path: Path, warnings: list[str]) -> tuple[list[Event], float]:
+    document = json.loads(path.read_bytes())
+    if not isinstance(document, dict):
+        raise ValueError("invalid Claude stats cache")
+    first = timestamp(document.get("firstSessionDate"))
+    last_date = document.get("lastComputedDate")
+    usage = document.get("modelUsage")
+    if first is None or not isinstance(last_date, str) or not isinstance(usage, dict):
+        raise ValueError("incomplete Claude stats cache")
+    cutoff = timestamp(f"{last_date}T00:00:00Z")
+    if cutoff is None:
+        raise ValueError("invalid Claude stats cache date")
+    cutoff += 86400
+    result = []
+    for model, totals in usage.items():
+        if not isinstance(totals, dict):
+            continue
+        event = Event(
+            key=identity("claude-stats", str(path.resolve()), model, last_date),
+            provider="claude",
+            ts=first,
+            model=str(model),
+            input=integer(totals.get("inputTokens")),
+            output=integer(totals.get("outputTokens")),
+            cache_read=integer(totals.get("cacheReadInputTokens")),
+            cache_write=integer(totals.get("cacheCreationInputTokens")),
+            windows=("total",),
+        )
+        if event.total:
+            result.append(event)
+    if result:
+        warnings.append(
+            "Claude-historie aangevuld uit historisch aggregaat; "
+            "cache-TTL en dagverdeling ontbreken"
+        )
+    return result, cutoff
+
+
 def parse_gemini(path: Path, warnings: list[str]) -> list[Event]:
     document = json.loads(path.read_bytes())
     result = []

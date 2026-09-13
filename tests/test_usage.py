@@ -8,10 +8,10 @@ from datetime import UTC, datetime
 
 import pytest
 
-from raycast_ai_usage import cli, quotas
+from raycast_ai_usage import cli, history, quotas
 from raycast_ai_usage.history import roots, scan
 from raycast_ai_usage.model import PROVIDERS, WINDOWS, Event, Limit, Quota, timestamp
-from raycast_ai_usage.parsers import parse_claude, parse_codex, parse_gemini
+from raycast_ai_usage.parsers import parse_claude, parse_claude_stats, parse_codex, parse_gemini
 from raycast_ai_usage.pricing import aggregate, canonical_model, cost
 
 NOW = datetime(2026, 9, 13, 12, tzinfo=UTC).timestamp()
@@ -132,6 +132,67 @@ def test_claude_separate_request_counts(tmp_path):
     a, b = claude_row(10), claude_row(10)
     b["requestId"] = "request-2"
     assert len(parse_claude(write_lines(tmp_path / "log.jsonl", [a, b]), [])) == 2
+
+
+def test_claude_stats_cache_preserves_deleted_history(tmp_path):
+    path = tmp_path / "stats-cache.json"
+    path.write_text(
+        json.dumps(
+            {
+                "firstSessionDate": "2026-01-24T20:26:41Z",
+                "lastComputedDate": "2026-08-24",
+                "modelUsage": {
+                    "claude-opus-4-6": {
+                        "inputTokens": 10,
+                        "outputTokens": 20,
+                        "cacheReadInputTokens": 300,
+                        "cacheCreationInputTokens": 40,
+                    }
+                },
+            }
+        )
+    )
+    events, cutoff = parse_claude_stats(path, [])
+    assert cutoff == datetime(2026, 8, 25, tzinfo=UTC).timestamp()
+    assert len(events) == 1
+    assert events[0].total == 370
+    assert events[0].model == "claude-opus-4-6"
+
+
+def test_claude_stats_cache_replaces_overlapping_transcripts(tmp_path, monkeypatch):
+    monkeypatch.setattr(history.time, "time", lambda: NOW)
+    projects = tmp_path / "claude/projects"
+    old = claude_row(10, "2026-08-20T10:00:00Z")
+    recent = claude_row(30, "2026-08-26T10:00:00Z")
+    recent["requestId"] = "request-2"
+    recent["message"]["id"] = "message-2"
+    write_lines(projects / "session.jsonl", [old, recent])
+    (projects.parent / "stats-cache.json").write_text(
+        json.dumps(
+            {
+                "firstSessionDate": "2026-01-24T20:26:41Z",
+                "lastComputedDate": "2026-08-24",
+                "modelUsage": {
+                    "claude-opus-4-6": {
+                        "inputTokens": 1000,
+                        "outputTokens": 2000,
+                        "cacheReadInputTokens": 3000,
+                        "cacheCreationInputTokens": 4000,
+                    }
+                },
+            }
+        )
+    )
+    data = {p: [tmp_path / p] for p in PROVIDERS}
+    data["claude"] = [projects]
+    events, coverage = scan(data, tmp_path / "cache")
+    claude = [event for event in events if event.provider == "claude"]
+    assert len(claude) == 3
+    usage = aggregate(claude, NOW)["claude"]
+    assert usage["30d"]["total"] == 800
+    assert usage["365d"]["total"] == 10410
+    assert usage["total"]["total"] == 10410
+    assert any("historisch aggregaat" in warning for warning in coverage["claude"]["warnings"])
 
 
 def test_gemini_disjoint_usage(tmp_path):

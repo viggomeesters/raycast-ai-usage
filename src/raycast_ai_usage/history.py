@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import TypedDict
 
 from .model import PROVIDERS, Event
-from .parsers import PARSERS
+from .parsers import PARSERS, parse_claude_stats
 
 SCHEMA = 3
 
@@ -65,6 +66,7 @@ def scan(source_roots: dict[str, list[Path]], cache_dir: Path) -> tuple[list[Eve
                 if not root.exists():
                     continue
                 pattern = "**/chats/session-*.json" if provider == "gemini" else "**/*.jsonl"
+                root_events: list[Event] = []
                 try:
                     files = list(root.glob(pattern))
                 except OSError:
@@ -98,15 +100,41 @@ def scan(source_roots: dict[str, list[Path]], cache_dir: Path) -> tuple[list[Eve
                                     json.dumps(warnings),
                                 ),
                             )
-                        for event in events:
-                            prior = unique.get(event.key)
-                            if prior is None or event.total > prior.total:
-                                unique[event.key] = event
-                            previous = stats[provider]["last_event"]
-                            stats[provider]["last_event"] = max(event.ts, previous or 0)
+                        root_events.extend(events)
                         stats[provider]["warnings"].extend(warnings)
                     except (OSError, ValueError, TypeError, AttributeError):
                         stats[provider]["errors"] += 1
+                if provider == "claude":
+                    stats_path = root.parent / "stats-cache.json"
+                    if stats_path.is_file():
+                        warnings = []
+                        try:
+                            historical, cutoff = parse_claude_stats(stats_path, warnings)
+                            if historical:
+                                covers_365d = historical[0].ts >= time.time() - 365 * 86400
+                                historical_windows = (
+                                    ("365d", "total") if covers_365d else ("total",)
+                                )
+                                transcript_windows = (
+                                    ("1d", "7d", "30d")
+                                    if covers_365d
+                                    else ("1d", "7d", "30d", "365d")
+                                )
+                                for event in historical:
+                                    event.windows = historical_windows
+                                for event in root_events:
+                                    if event.ts < cutoff:
+                                        event.windows = transcript_windows
+                                root_events.extend(historical)
+                            stats[provider]["warnings"].extend(warnings)
+                        except (OSError, ValueError, TypeError, AttributeError):
+                            stats[provider]["errors"] += 1
+                for event in root_events:
+                    prior = unique.get(event.key)
+                    if prior is None or event.total > prior.total:
+                        unique[event.key] = event
+                    previous = stats[provider]["last_event"]
+                    stats[provider]["last_event"] = max(event.ts, previous or 0)
             stats[provider]["warnings"] = sorted(set(stats[provider]["warnings"]))
         # Removed/archived source files must not survive as phantom usage.
         for (path,) in db.execute("SELECT path FROM files").fetchall():

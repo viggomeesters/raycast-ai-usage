@@ -81,7 +81,7 @@ credentials or network error does not hide the others.
 | Provider | Local history | Account limits |
 | --- | --- | --- |
 | Codex | `~/.codex/sessions` and `archived_sessions` | Signed-in `codex app-server`, `account/rateLimits/read` |
-| Claude | `~/.claude/projects`, `~/.config/claude/projects`, embedded Desktop Code session stores | Claude Code OAuth usage; Bedrock/API/Vertex have different quota systems |
+| Claude | `~/.claude/projects`, `stats-cache.json`, custom profiles and embedded Desktop Code session stores | Claude Code OAuth usage; Bedrock/API/Vertex have different quota systems |
 | Gemini | `~/.gemini/tmp/**/chats/session-*.json` | Gemini CLI OAuth quota buckets, per model |
 
 `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `GEMINI_HOME` override data roots. Custom
@@ -107,6 +107,11 @@ selects the active quota system; historical costs remain standard API estimates.
   Neither means unlimited. No quota is inferred from tokens or dollar amounts.
 - **Tokens totaal** = uncached input + cached input + cache creation + output.
   Reasoning is included in output once. Use JSON for each category.
+- Claude's `stats-cache.json` preserves lifetime model totals after old transcripts
+  disappear. Those totals supplement `365d` only when the entire recorded history
+  fits inside that window, and always supplement `Totaal`. Newer transcripts remain
+  the source for short rolling windows. The cache does not retain cache-write TTL,
+  so supplemented cost estimates are marked partial with `*`.
 - Claude streaming records are deduplicated by message/request; Codex repeated
   counters and replayed fork histories are deduplicated. Gemini thought tokens
   are added to its separately reported visible output.

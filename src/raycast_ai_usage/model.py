@@ -58,6 +58,7 @@ class Event:
     cache_write: int = 0
     cache_write_1h: int = 0
     reasoning: int = 0  # A subset of output; never add again to total/cost.
+    windows: tuple[str, ...] | list[str] | None = None
 
     @property
     def total(self) -> int:
