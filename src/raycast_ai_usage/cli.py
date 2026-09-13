@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .history import roots, scan
-from .model import PROVIDERS, WINDOWS, Quota, utc_iso
+from .model import PROVIDERS, Quota, utc_iso
 from .pricing import PRICE_DATE, aggregate
 from .quotas import fetch
 
@@ -62,74 +62,74 @@ def sum_window(report: dict, window: str) -> dict:
     }
 
 
+DISPLAY_PROVIDERS = ("gemini", "claude", "codex")
+DISPLAY_WINDOWS = (
+    ("1d", "24h"),
+    ("7d", "7d"),
+    ("30d", "30d"),
+    ("365d", "365d"),
+    ("total", "Totaal"),
+)
+
+
+def usage_line(label: str, tokens: str, cost: str) -> str:
+    return f"{label:<8} {tokens} tokens  ({cost})"
+
+
 def format_report(report: dict, quotas: dict[str, Quota], output_only: bool = False) -> str:
     updated = datetime.fromtimestamp(report["timestamp"]).astimezone().strftime("%Y-%m-%d %H:%M")
     lines = [
-        "## AI-gebruik",
-        "",
-        f"_Bijgewerkt: {updated}_",
-        "",
-        "### Limieten over",
-        "",
-        "| Provider | 5h | 7d |",
-        "| --- | ---: | ---: |",
+        "AI-GEBRUIK",
+        f"Bijgewerkt: {updated}",
     ]
-    for provider in PROVIDERS:
-        quota = quotas[provider]
-        lines.append(
-            f"| {provider.title()} | {quota_cell(quota, 300)} | {quota_cell(quota, 10080)} |"
-        )
-
-    metric = "Outputtokens" if output_only else "Tokens"
-    lines.extend(
-        [
-            "",
-            "### Tokens en geschatte kosten",
-            "",
-            "| Provider | Metriek | 1d | 7d | 30d | 365d | Totaal |",
-            "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
-        ]
-    )
     any_missing = False
     any_partial = False
-    for provider in PROVIDERS:
+    for provider in DISPLAY_PROVIDERS:
         stats = report["coverage"][provider]
         available = stats["last_event"] is not None
         partial = bool(stats["errors"] or stats["warnings"])
         any_missing = any_missing or not available
         any_partial = any_partial or partial
-        token_values = [
-            token_cell(report["usage"][provider][window], available, output_only)
-            for window in WINDOWS
-        ]
-        cost_values = [
-            cost_cell(report["usage"][provider][window], available, partial) for window in WINDOWS
-        ]
-        label = provider.title()
-        lines.append(f"| {label} | {metric} | " + " | ".join(token_values) + " |")
-        lines.append(f"| {label} | Kosten | " + " | ".join(cost_values) + " |")
+        lines.extend(["", provider.upper()])
+        for window, label in DISPLAY_WINDOWS:
+            data = report["usage"][provider][window]
+            lines.append(
+                usage_line(
+                    label,
+                    token_cell(data, available, output_only),
+                    cost_cell(data, available, partial),
+                )
+            )
 
-    total_tokens = []
-    total_costs = []
-    for window in WINDOWS:
+    lines.extend(["", "TOTALEN"])
+    for window, label in DISPLAY_WINDOWS:
         data = sum_window(report, window)
-        total_tokens.append(
+        total_tokens = (
             ("≥" if any_missing else "")
             + compact(data["output"] if output_only else data["total"])
             + ("*" if any_missing else "")
         )
-        total_costs.append(
-            cost_cell(data, True, any_partial or any_missing, lower_bound=any_missing)
+        lines.append(
+            usage_line(
+                label,
+                total_tokens,
+                cost_cell(data, True, any_partial or any_missing, lower_bound=any_missing),
+            )
         )
-    lines.append(f"| **Totaal** | **{metric}** | " + " | ".join(total_tokens) + " |")
-    lines.append("| **Totaal** | **Kosten** | " + " | ".join(total_costs) + " |")
     lines.extend(
         [
             "",
-            "> Kosten zijn geschatte standaard API-tokenwaarden in USD, geen facturen.",
-            "> `—` = niet van toepassing · `?` = onbekend · `*` = gedeeltelijk.",
+            "Kosten: geschatte standaard API-tokenwaarden in USD, geen facturen.",
+            "— = niet van toepassing   ? = onbekend   * = gedeeltelijk",
+            "",
+            "LIMIETEN OVER",
         ]
     )
+    for provider in DISPLAY_PROVIDERS:
+        quota = quotas[provider]
+        lines.append(
+            f"{provider.title():<8} 5h {quota_cell(quota, 300)}   7d {quota_cell(quota, 10080)}"
+        )
     return "\n".join(lines)
 
 

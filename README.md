@@ -5,33 +5,47 @@ limits, tokens and estimated API token costs over rolling **1d, 7d, 30d and 365d
 plus the complete locally available history.
 Python 3.11+, no runtime dependencies. The Raycast interface is Dutch.
 
-```markdown
-## AI-gebruik
+```text
+AI-GEBRUIK
+Bijgewerkt: 2026-09-13 14:30
 
-### Limieten over
+GEMINI
+24h      0 tokens  ($0.00)
+7d       0 tokens  ($0.00)
+30d      0 tokens  ($0.00)
+365d     150.0k tokens  ($0.23)
+Totaal   150.0k tokens  ($0.23)
 
-| Provider | 5h | 7d |
-| --- | ---: | ---: |
-| Gemini | ? | ? |
-| Codex | — | 41% |
-| Claude | 88% | 65% |
+CLAUDE
+24h      800.0k tokens  ($3.10)
+7d       5.6M tokens  ($21.70)
+30d      24.0M tokens  ($93.00)
+365d     80.0M tokens  ($310.00)
+Totaal   80.0M tokens  ($310.00)
 
-### Tokens en geschatte kosten
+CODEX
+24h      1.2M tokens  ($4.20)
+7d       8.4M tokens  ($29.40)
+30d      36.0M tokens  ($126.00)
+365d     120.0M tokens  ($420.00)
+Totaal   120.0M tokens  ($420.00)
 
-| Provider | Metriek | 1d | 7d | 30d | 365d | Totaal |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Gemini | Tokens | 0 | 0 | 0 | 150k | 150k |
-| Gemini | Kosten | $0.00 | $0.00 | $0.00 | $0.23 | $0.23 |
-| Codex | Tokens | 1.2M | 8.4M | 36.0M | 120M | 120M |
-| Codex | Kosten | $4.20 | $29.40 | $126.00 | $420.00 | $420.00 |
-| Claude | Tokens | 0.8M | 5.6M | 24.0M | 80M | 80M |
-| Claude | Kosten | $3.10 | $21.70 | $93.00 | $310.00 | $310.00 |
-| **Totaal** | **Tokens** | 2.0M | 14.0M | 60.0M | 200.2M | 200.2M |
-| **Totaal** | **Kosten** | $7.30 | $51.10 | $219.00 | $730.23 | $730.23 |
+TOTALEN
+24h      2.0M tokens  ($7.30)
+7d       14.0M tokens  ($51.10)
+30d      60.0M tokens  ($219.00)
+365d     200.2M tokens  ($730.23)
+Totaal   200.2M tokens  ($730.23)
+
+LIMIETEN OVER
+Gemini   5h ?   7d ?
+Claude   5h 88%   7d 65%
+Codex    5h —   7d 41%
 ```
 
-Illustrative numbers only. Raycast returns plain Markdown so the entire result can
-be copied directly into Obsidian, GitHub or another Markdown editor.
+Illustrative numbers only. The vertically grouped plain-text result stays readable
+in Raycast and can be copied directly into Obsidian or another notes app. Remaining
+limits are last because Raycast opens a completed Script Command at the bottom.
 
 ## Install
 

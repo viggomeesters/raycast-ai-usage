@@ -361,7 +361,7 @@ def report_fixture():
     }
 
 
-def test_markdown_report_is_copyable_and_complete():
+def test_vertical_report_is_copyable_and_complete():
     report = report_fixture()
     q = {
         p: Quota(p, "ok", "source", limits=[Limit("a", 70, 300), Limit("b", 30, 10080)])
@@ -369,13 +369,23 @@ def test_markdown_report_is_copyable_and_complete():
     }
     text = cli.format_report(report, q)
     lines = text.splitlines()
-    assert lines[0] == "## AI-gebruik"
-    assert "| Provider | Metriek | 1d | 7d | 30d | 365d | Totaal |" in text
-    for name in ("Gemini", "Codex", "Claude"):
-        assert f"| {name} | Tokens |" in text
-        assert f"| {name} | Kosten |" in text
-    assert "| **Totaal** | **Tokens** |" in text
-    assert "| **Totaal** | **Kosten** |" in text
+    assert lines[0] == "AI-GEBRUIK"
+    assert "|" not in text
+    assert text.index("GEMINI") < text.index("CLAUDE") < text.index("CODEX")
+    assert text.index("CODEX") < text.index("TOTALEN") < text.index("LIMIETEN OVER")
+    for name in ("GEMINI", "CLAUDE", "CODEX", "TOTALEN"):
+        block = text[text.index(name) :]
+        assert "24h" in block
+        assert "7d" in block
+        assert "30d" in block
+        assert "365d" in block
+        assert "Totaal" in block
+    assert [line for line in lines if line][-4:] == [
+        "LIMIETEN OVER",
+        "Gemini   5h 70%   7d 30%",
+        "Claude   5h 70%   7d 30%",
+        "Codex    5h 70%   7d 30%",
+    ]
     assert not any("ophalen" in line.lower() for line in lines)
 
 
@@ -385,7 +395,8 @@ def test_empty_and_partial_are_visible():
     report["usage"]["codex"]["1d"]["unpriced_tokens"] = 50
     q = {p: Quota(p, "unavailable", "source") for p in PROVIDERS}
     text = cli.format_report(report, q)
-    assert "| Gemini | Tokens | ? | ? | ? | ? | ? |" in text
+    gemini = text[text.index("GEMINI") : text.index("CLAUDE")]
+    assert "24h      ? tokens  (?)" in gemini
     assert "≥$" in text
     assert "gedeeltelijk" in text
 
@@ -399,8 +410,9 @@ def test_total_rows_sum_all_providers():
             report["usage"][provider][window]["estimated_usd"] = index * 1.25
     q = {p: Quota(p, "ok", "source") for p in PROVIDERS}
     text = cli.format_report(report, q)
-    assert "| **Totaal** | **Tokens** | 6.0k | 6.0k | 6.0k | 6.0k | 6.0k |" in text
-    assert "| **Totaal** | **Kosten** | $7.50 | $7.50 | $7.50 | $7.50 | $7.50 |" in text
+    totals = text[text.index("TOTALEN") : text.index("LIMIETEN OVER")]
+    assert "24h      6.0k tokens  ($7.50)" in totals
+    assert "Totaal   6.0k tokens  ($7.50)" in totals
 
 
 def test_total_rows_mark_missing_provider_as_partial():
@@ -408,8 +420,8 @@ def test_total_rows_mark_missing_provider_as_partial():
     report["coverage"]["gemini"]["last_event"] = None
     q = {p: Quota(p, "ok", "source") for p in PROVIDERS}
     text = cli.format_report(report, q)
-    assert "| **Totaal** | **Tokens** | ≥100* |" in text
-    assert "| **Totaal** | **Kosten** | ≥$0.00* |" in text
+    totals = text[text.index("TOTALEN") : text.index("LIMIETEN OVER")]
+    assert "24h      ≥100* tokens  (≥$0.00*)" in totals
 
 
 def test_cli_json_empty_and_cache_failure(tmp_path):
