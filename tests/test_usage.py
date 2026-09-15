@@ -523,6 +523,7 @@ def test_cli_json_empty_and_cache_failure(tmp_path):
         for k, v in os.environ.items()
         if k not in ("CODEX_HOME", "CLAUDE_CONFIG_DIR", "GEMINI_HOME")
     }
+    env["XDG_DATA_HOME"] = str(tmp_path / "data")
     args = [
         sys.executable,
         "-m",
@@ -538,6 +539,8 @@ def test_cli_json_empty_and_cache_failure(tmp_path):
     report = json.loads(result.stdout)
     assert report["coverage"]["codex"]["last_event"] is None
     assert report["quotas"]["claude"]["status"] == "offline"
+    with sqlite3.connect(tmp_path / "data/raycast-ai-usage/snapshots.sqlite3") as db:
+        assert db.execute("SELECT count(*) FROM snapshots").fetchone()[0] == 1
     blocker = tmp_path / "file"
     blocker.write_text("file")
     args[-1] = str(blocker)

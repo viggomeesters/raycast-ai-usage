@@ -17,6 +17,7 @@ from .history import roots, scan
 from .model import PROVIDERS, Quota, utc_iso
 from .pricing import PRICE_DATE, aggregate, aggregate_months
 from .quotas import fetch
+from .snapshots import save_snapshot
 
 
 def compact(value: int | float) -> str:
@@ -161,6 +162,7 @@ def parser() -> argparse.ArgumentParser:
         help="Toon outputtokens incl. reasoning; kosten blijven alle tokens",
     )
     result.add_argument("--cache-dir", type=Path, help="Map voor de lokale metadata-cache")
+    result.add_argument("--snapshot-db", type=Path, help="Alternatief lokaal snapshotbestand")
     result.add_argument("--data-home", type=Path, help="Alternatieve datamap; vereist --offline")
     return result
 
@@ -174,6 +176,11 @@ def main() -> int:
     cache = (
         args.cache_dir
         or Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "raycast-ai-usage"
+    )
+    snapshot_db = (
+        args.snapshot_db
+        or Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+        / "raycast-ai-usage/snapshots.sqlite3"
     )
     try:
         config_path = (
@@ -199,7 +206,7 @@ def main() -> int:
             quotas = {p: job.result() for p, job in pending_quotas.items()}
         now = time.time()
         report = {
-            "schema_version": 1,
+            "schema_version": 2,
             "timestamp": now,
             "updated_at": utc_iso(now),
             "scope": "local_cli_logs_all_local_accounts",
@@ -211,6 +218,13 @@ def main() -> int:
             "coverage": coverage,
             "quotas": {p: asdict(q) for p, q in quotas.items()},
             "duration_seconds": time.monotonic() - started,
+        }
+        snapshot = save_snapshot(report, snapshot_db)
+        report["snapshot"] = {
+            "id": snapshot.run_id,
+            "status": snapshot.status,
+            "additive": False,
+            "deltas": snapshot.deltas,
         }
         print(
             json.dumps(report, indent=2)

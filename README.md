@@ -83,12 +83,29 @@ Run once in Terminal to build the cache and handle any macOS Keychain prompt.
 uv run ai-usage --json           # Machine-readable report
 uv run ai-usage --offline        # Logs only, no credentials/network/CLI probes
 uv run ai-usage --output-tokens  # Generated output incl. reasoning; cost still all tokens
+uv run ai-usage --snapshot-db /path/to/snapshots.sqlite3
 make test check build           # Local checks, no GitHub Actions
 ```
 
 The first scan may take longer on large histories. Unchanged files use a local
 SQLite metadata cache; changed files are rescanned. One provider's missing
 credentials or network error does not hide the others.
+
+## Snapshots
+
+Every successful CLI or Raycast run appends one point-in-time snapshot to
+`~/.local/share/raycast-ai-usage/snapshots.sqlite3` (or `$XDG_DATA_HOME`). The
+database has private file permissions and stores normalized totals, coverage and
+month buckets only. Quotas, credentials, prompts, responses and source paths are
+not stored.
+
+Snapshots are explicitly marked `additive = 0`: their totals must never be summed.
+The ledger compares only consecutive cumulative totals under the same measurement
+contract. It records a delta only when coverage is stable, totals never decrease,
+and a provider's latest event advances when its total grows. File-count changes,
+counter decreases and historical backfills start a new comparison baseline instead
+of becoming usage. USD deltas are omitted when the checked-in pricing snapshot
+changes. JSON output includes the snapshot id, comparison status and any safe delta.
 
 ## What is measured
 
