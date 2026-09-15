@@ -37,6 +37,20 @@ TOTALEN
 365d     200.2M tokens  ($730.23)
 Totaal   200.2M tokens  ($730.23)
 
+MAANDTOTALEN
+2026-09  42.0M tokens  ($153.20)
+2026-08  58.0M tokens  ($211.40)
+2026-07  ≥37.0M* tokens  (≥$136.00*)
+2026-06  ≥24.0M* tokens  (≥$89.63*)
+2026-05  0 tokens  ($0.00)
+2026-04  0 tokens  ($0.00)
+2026-03  0 tokens  ($0.00)
+2026-02  0 tokens  ($0.00)
+2026-01  0 tokens  ($0.00)
+2025-12  0 tokens  ($0.00)
+2025-11  0 tokens  ($0.00)
+2025-10  0 tokens  ($0.00)
+
 LIMIETEN OVER
 Gemini   5h ?   7d ?
 Claude   5h 88%   7d 65%
@@ -118,6 +132,9 @@ selects the active quota system; historical costs remain standard API estimates.
 - Windows use actual timestamps: the last 24 hours, 7 days, 30 days and 365 days,
   inclusive, ending at the report time. `Totaal` covers every available local log.
   These are not calendar-day buckets.
+- `MAANDTOTALEN` shows the current calendar month and the previous eleven months,
+  newest first. A `≥…*` month contains a known subtotal plus history that cannot be
+  assigned precisely to that month, such as Claude's retained lifetime aggregate.
 - History covers **local CLI/Code logs across local accounts**, not web chats,
   all machines, cloud tasks, general API usage, or an organization billing export.
   Old logs with no recent activity can yield zero; absent/unreadable history yields

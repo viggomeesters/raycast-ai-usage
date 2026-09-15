@@ -165,6 +165,8 @@ def parse_claude_stats(path: Path, warnings: list[str]) -> tuple[list[Event], fl
             cache_read=integer(totals.get("cacheReadInputTokens")),
             cache_write=integer(totals.get("cacheCreationInputTokens")),
             windows=("total",),
+            monthly=False,
+            aggregate_until=cutoff,
         )
         if event.total:
             result.append(event)

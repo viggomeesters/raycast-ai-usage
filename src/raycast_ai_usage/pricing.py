@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from .model import PROVIDERS, WINDOWS, Event
 
@@ -125,3 +126,72 @@ def aggregate(events: list[Event], now: float) -> dict:
             else:
                 bucket["estimated_usd"] += estimate
     return result
+
+
+def aggregate_months(events: list[Event], now: float, count: int = 12) -> list[dict]:
+    current = datetime.fromtimestamp(now, UTC)
+    month_ids = []
+    month_bounds = {}
+    absolute_month = current.year * 12 + current.month - 1
+    for offset in range(count):
+        value = absolute_month - offset
+        year, zero_based_month = divmod(value, 12)
+        month = zero_based_month + 1
+        key = f"{year:04d}-{month:02d}"
+        next_value = value + 1
+        next_year, next_zero_based_month = divmod(next_value, 12)
+        start = datetime(year, month, 1, tzinfo=UTC).timestamp()
+        end = datetime(next_year, next_zero_based_month + 1, 1, tzinfo=UTC).timestamp()
+        month_ids.append(key)
+        month_bounds[key] = (start, end)
+
+    result: dict[str, dict] = {
+        month: {
+            "month": month,
+            "input": 0,
+            "output": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+            "cache_write_1h": 0,
+            "reasoning": 0,
+            "total": 0,
+            "events": 0,
+            "estimated_usd": 0.0,
+            "unpriced_tokens": 0,
+            "unpriced_models": [],
+            "partial": False,
+        }
+        for month in month_ids
+    }
+    for event in events:
+        if not event.monthly:
+            if event.aggregate_until is not None:
+                for month, (start, end) in month_bounds.items():
+                    if event.ts < end and event.aggregate_until > start:
+                        result[month]["partial"] = True
+            continue
+        if event.ts > now:
+            continue
+        month = datetime.fromtimestamp(event.ts, UTC).strftime("%Y-%m")
+        if month not in result:
+            continue
+        bucket = result[month]
+        for field in (
+            "input",
+            "output",
+            "cache_read",
+            "cache_write",
+            "cache_write_1h",
+            "reasoning",
+            "total",
+        ):
+            bucket[field] += getattr(event, field)
+        bucket["events"] += 1
+        estimate = cost(event)
+        if estimate is None:
+            bucket["unpriced_tokens"] += event.total
+            if event.model not in bucket["unpriced_models"]:
+                bucket["unpriced_models"].append(event.model)
+        else:
+            bucket["estimated_usd"] += estimate
+    return [result[month] for month in month_ids]

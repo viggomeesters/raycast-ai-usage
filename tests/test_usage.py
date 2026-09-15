@@ -12,7 +12,7 @@ from raycast_ai_usage import cli, history, quotas
 from raycast_ai_usage.history import roots, scan
 from raycast_ai_usage.model import PROVIDERS, WINDOWS, Event, Limit, Quota, timestamp
 from raycast_ai_usage.parsers import parse_claude, parse_claude_stats, parse_codex, parse_gemini
-from raycast_ai_usage.pricing import aggregate, canonical_model, cost
+from raycast_ai_usage.pricing import aggregate, aggregate_months, canonical_model, cost
 
 NOW = datetime(2026, 9, 13, 12, tzinfo=UTC).timestamp()
 
@@ -275,6 +275,35 @@ def test_rolling_windows_boundaries_and_unknown_prices():
     assert report["unpriced_models"] == ["future-model"]
 
 
+def test_calendar_month_totals_and_unallocated_history():
+    now = datetime(2026, 3, 15, 12, tzinfo=UTC).timestamp()
+    events = [
+        Event(
+            "known",
+            "codex",
+            datetime(2026, 2, 10, tzinfo=UTC).timestamp(),
+            "gpt-6-astra",
+            input=200,
+        ),
+        Event(
+            "historical",
+            "claude",
+            datetime(2026, 1, 10, tzinfo=UTC).timestamp(),
+            "claude-opus-5",
+            input=1000,
+            monthly=False,
+            aggregate_until=datetime(2026, 3, 1, tzinfo=UTC).timestamp(),
+        ),
+    ]
+    months = aggregate_months(events, now, count=3)
+    assert [month["month"] for month in months] == ["2026-03", "2026-02", "2026-01"]
+    assert months[0]["partial"] is False
+    assert months[1]["total"] == 200
+    assert months[1]["partial"] is True
+    assert months[2]["total"] == 0
+    assert months[2]["partial"] is True
+
+
 def test_history_cache_dedup_updates_deletions_and_no_content(tmp_path):
     data = {p: [tmp_path / p] for p in PROVIDERS}
     row = claude_row(10)
@@ -418,6 +447,7 @@ def report_fixture():
         "timestamp": NOW,
         "coverage": coverage,
         "usage": aggregate(events, NOW),
+        "months": aggregate_months(events, NOW),
         "duration_seconds": 1.2,
     }
 
@@ -433,7 +463,9 @@ def test_vertical_report_is_copyable_and_complete():
     assert lines[0] == "AI-GEBRUIK"
     assert "|" not in text
     assert text.index("GEMINI") < text.index("CLAUDE") < text.index("CODEX")
-    assert text.index("CODEX") < text.index("TOTALEN") < text.index("LIMIETEN OVER")
+    assert text.index("CODEX") < text.index("TOTALEN") < text.index("MAANDTOTALEN")
+    assert text.index("MAANDTOTALEN") < text.index("LIMIETEN OVER")
+    assert "2026-09  100 tokens  ($0.00)" in text
     for name in ("GEMINI", "CLAUDE", "CODEX", "TOTALEN"):
         block = text[text.index(name) :]
         assert "24h" in block

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .history import roots, scan
 from .model import PROVIDERS, Quota, utc_iso
-from .pricing import PRICE_DATE, aggregate
+from .pricing import PRICE_DATE, aggregate, aggregate_months
 from .quotas import fetch
 
 
@@ -84,12 +84,14 @@ def format_report(report: dict, quotas: dict[str, Quota], output_only: bool = Fa
     ]
     any_missing = False
     any_partial = False
+    any_errors = False
     for provider in DISPLAY_PROVIDERS:
         stats = report["coverage"][provider]
         available = stats["last_event"] is not None
         partial = bool(stats["errors"] or stats["warnings"])
         any_missing = any_missing or not available
         any_partial = any_partial or partial
+        any_errors = any_errors or bool(stats["errors"])
         lines.extend(["", provider.upper()])
         for window, label in DISPLAY_WINDOWS:
             data = report["usage"][provider][window]
@@ -114,6 +116,18 @@ def format_report(report: dict, quotas: dict[str, Quota], output_only: bool = Fa
                 label,
                 total_tokens,
                 cost_cell(data, True, any_partial or any_missing, lower_bound=any_missing),
+            )
+        )
+    lines.extend(["", "MAANDTOTALEN"])
+    for month in report.get("months", []):
+        partial = bool(month["partial"] or any_missing or any_errors)
+        value = month["output"] if output_only else month["total"]
+        tokens = ("≥" if partial else "") + compact(value) + ("*" if partial else "")
+        lines.append(
+            usage_line(
+                month["month"],
+                tokens,
+                cost_cell(month, True, partial, lower_bound=partial),
             )
         )
     lines.extend(
@@ -193,6 +207,7 @@ def main() -> int:
             "cost_basis": "current_standard_api_token_list_prices_not_billed",
             "pricing_date": PRICE_DATE,
             "usage": aggregate(events, now),
+            "months": aggregate_months(events, now),
             "coverage": coverage,
             "quotas": {p: asdict(q) for p, q in quotas.items()},
             "duration_seconds": time.monotonic() - started,
