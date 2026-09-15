@@ -1,9 +1,10 @@
 # Raycast AI Usage
 
-A small local Script Command for **Gemini, Codex and Claude**: remaining account
+A small native Raycast Extension for **Gemini, Codex and Claude**: remaining account
 limits, tokens and estimated API token costs over rolling **1d, 7d, 30d and 365d**,
 plus the complete locally available history.
-Python 3.11+, no runtime dependencies. The Raycast interface is Dutch.
+The Python backend has no runtime dependencies beyond Python 3.11+. The Raycast
+interface is Dutch.
 
 ```text
 AI-GEBRUIK
@@ -57,9 +58,10 @@ Claude   5h 88%   7d 65%
 Codex    5h —   7d 41%
 ```
 
-Illustrative numbers only. The vertically grouped plain-text result stays readable
+Illustrative numbers only. The vertically grouped monospace result stays readable
 in Raycast and can be copied directly into Obsidian or another notes app. Remaining
-limits are last because Raycast opens a completed Script Command at the bottom.
+limits stay at the bottom of the report. Use **Copy Report** (`⌘C`) to copy the
+plain-text version without Markdown fencing.
 
 ## Install
 
@@ -69,15 +71,22 @@ Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and
 ```sh
 git clone https://github.com/viggomeesters/raycast-ai-usage.git
 cd raycast-ai-usage
-uv sync --no-dev
-chmod +x raycast/ai-usage.sh
-uv run ai-usage
+uv tool install .
+ai-usage
+cd extension
+npm install
+npm run dev
 ```
 
-In Raycast, open **Extensions → + → Add Script Directory** and select this
-repository's `raycast` directory. Search for **AI Usage** and press Enter.
-You can assign a hotkey or alias in Raycast. No background service is installed.
-Run once in Terminal to build the cache and handle any macOS Keychain prompt.
+`npm run dev` builds and registers the native extension with Raycast. Search for
+**AI Usage** and press Enter. You can assign a hotkey or alias in Raycast. Stop the
+development process after registration; the command remains available. No
+background service is installed. Run `ai-usage` once in Terminal first to build
+the cache and handle any macOS Keychain prompt.
+
+The extension locates the command installed by `uv tool install .` automatically.
+During development it also accepts the repository's `.venv/bin/ai-usage` through
+the **Backend Path** preference in Raycast.
 
 ```sh
 uv run ai-usage --json           # Machine-readable report
@@ -85,6 +94,7 @@ uv run ai-usage --offline        # Logs only, no credentials/network/CLI probes
 uv run ai-usage --output-tokens  # Generated output incl. reasoning; cost still all tokens
 uv run ai-usage --snapshot-db /path/to/snapshots.sqlite3
 make test check build           # Local checks, no GitHub Actions
+cd extension && npm run check   # Native Raycast checks
 ```
 
 The first scan may take longer on large histories. Unchanged files use a local
@@ -93,7 +103,7 @@ credentials or network error does not hide the others.
 
 ## Snapshots
 
-Every successful CLI or Raycast run appends one point-in-time snapshot to
+Every successful CLI or native Raycast run appends one point-in-time snapshot to
 `~/.local/share/raycast-ai-usage/snapshots.sqlite3` (or `$XDG_DATA_HOME`). The
 database has private file permissions and stores normalized totals, coverage and
 month buckets only. Quotas, credentials, prompts, responses and source paths are
@@ -213,6 +223,7 @@ repository. Public test records are synthetic. Tests do not call live providers.
 ```sh
 uv sync
 make test check build
+cd extension && npm install && npm run check
 ```
 
 MIT licensed. Unaffiliated with the providers or Raycast.
